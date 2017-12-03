@@ -8,6 +8,8 @@
 namespace App\Crawlers;
 
 use Goutte\Client;
+use Symfony\Component\DomCrawler\Crawler;
+use Symfony\Component\DomCrawler\Form;
 
 /**
  * Class AbstractLoginClient
@@ -21,9 +23,10 @@ abstract class AbstractLoginClient
     abstract protected function getLoginUrl(): string;
 
     /**
-     * @return Client
+     * @param Crawler $crawler
+     * @return Form
      */
-    abstract protected function getLoggedInClient(): Client;
+    abstract protected function logic(Crawler $crawler): Form;
 
     /**
      * @var array
@@ -34,6 +37,11 @@ abstract class AbstractLoginClient
      * @var array
      */
     protected $user;
+
+    /**
+     * @var Client
+     */
+    protected $client;
 
     /**
      * LoggedInClient constructor.
@@ -56,6 +64,18 @@ abstract class AbstractLoginClient
         }
         $client = new Client();
         $client->getCookieJar()->updateFromSetCookie($this->cookie);
+        return $client;
+    }
+
+    /**
+     * @return Client
+     */
+    protected function getLoggedInClient(): Client
+    {
+        $client = new Client();
+        $crawler = $client->request('GET', $this->getLoginUrl());
+        $form = $this->logic($crawler);
+        $client->submit($form);
         return $client;
     }
 

@@ -22,10 +22,10 @@ abstract class AbstractCrawler
     abstract protected function getUrl(): string;
 
     /**
-     * @param Crawler $crawler
+     * @param array $parameters
      * @return array
      */
-    abstract protected function logic(Crawler $crawler): array;
+    abstract protected function logic(array $parameters): array;
 
     /**
      * @var string[]
@@ -55,38 +55,40 @@ abstract class AbstractCrawler
     protected $paginationStart = 1;
 
     /**
+     * @var int
+     */
+    protected $current;
+
+    /**
      * AbstractCrawler constructor.
      * @param AbstractLoginClient|null $client
      */
     public function __construct(AbstractLoginClient $client = null)
     {
-        if (is_null($client)) {
-            $client = new Client();
+        $goutte = new Client();
+        if (is_subclass_of($client, AbstractLoginClient::class)) {
+            $goutte = $client->getClient();
         }
-        $this->client = $client;
+        $this->client = $goutte;
     }
 
     /**
      * @param array $parameters
      * @return array
      */
-    protected function crawl(array $parameters = []): array
+    public function crawl(array $parameters = []): array
     {
         if ($this->hasPaginator === false) {
-            $crawler = $this->createCrawler($parameters);
-            return $this->logic($crawler);
+            return $this->logic($parameters);
         }
         $values = [];
-        $current = $this->paginationStart;
+        $this->current = $this->paginationStart;
         while (true) {
-            $crawler = $this->createCrawler(array_merge([
-                $this->paginationParamName => $current,
-            ], $parameters));
-            $values[] = $this->logic($crawler);
+            $values[] = array_merge($values, $this->logic($parameters));
             if ($this->hasNext() === false) {
                 break;
             }
-            $current++;
+            $this->current++;
         }
         return $values;
     }
@@ -97,6 +99,11 @@ abstract class AbstractCrawler
      */
     protected function createCrawler(array $parameters = []): Crawler
     {
+        if ($this->hasPaginator) {
+            $parameters = array_merge([
+                $this->paginationParamName => $this->current,
+            ], $parameters);
+        }
         return $this->getSetupClient()->request('GET', $this->getUrl(), $parameters);
     }
 
