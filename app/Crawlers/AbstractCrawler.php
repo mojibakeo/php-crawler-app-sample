@@ -17,6 +17,17 @@ use Symfony\Component\DomCrawler\Crawler;
 abstract class AbstractCrawler
 {
     /**
+     * @return string
+     */
+    abstract protected function getUrl(): string;
+
+    /**
+     * @param Crawler $crawler
+     * @return array
+     */
+    abstract protected function logic(Crawler $crawler): array;
+
+    /**
      * @var string[]
      */
     protected $headers = [
@@ -27,6 +38,21 @@ abstract class AbstractCrawler
      * @var AbstractLoginClient|Client
      */
     protected $client;
+
+    /**
+     * @var bool
+     */
+    protected $hasPaginator = false;
+
+    /**
+     * @var string
+     */
+    protected $paginationParamName = 'page';
+
+    /**
+     * @var int
+     */
+    protected $paginationStart = 1;
 
     /**
      * AbstractCrawler constructor.
@@ -41,13 +67,37 @@ abstract class AbstractCrawler
     }
 
     /**
-     * @param string $url
+     * @param array $parameters
+     * @return array
+     */
+    protected function crawl(array $parameters = []): array
+    {
+        if ($this->hasPaginator === false) {
+            $crawler = $this->createCrawler($parameters);
+            return $this->logic($crawler);
+        }
+        $values = [];
+        $current = $this->paginationStart;
+        while (true) {
+            $crawler = $this->createCrawler(array_merge([
+                $this->paginationParamName => $current,
+            ], $parameters));
+            $values[] = $this->logic($crawler);
+            if ($this->hasNext() === false) {
+                break;
+            }
+            $current++;
+        }
+        return $values;
+    }
+
+    /**
      * @param array $parameters
      * @return Crawler
      */
-    protected function createCrawler(string $url, array $parameters = []): Crawler
+    protected function createCrawler(array $parameters = []): Crawler
     {
-        return $this->getSetupClient()->request('GET', $url, $parameters);
+        return $this->getSetupClient()->request('GET', $this->getUrl(), $parameters);
     }
 
     /**
@@ -81,5 +131,13 @@ abstract class AbstractCrawler
     protected function appendHeaderValue(string $key, string $value): void
     {
         $this->headers[] = [$key => $value];
+    }
+
+    /**
+     * @return bool
+     */
+    protected function hasNext(): bool
+    {
+        return false;
     }
 }
